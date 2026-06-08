@@ -1,58 +1,67 @@
 package com.phucnt.mytranslator
 
 import android.annotation.SuppressLint
+import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioPlaybackCaptureConfiguration
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.projection.MediaProjection
+import android.os.Build
 import android.util.Log
 import kotlin.concurrent.thread
 
 /**
- * Captures microphone audio as 16 kHz / mono / 16-bit little-endian PCM —
- * exactly the format the Soniox real-time endpoint expects — and hands each
+ * Captures audio as mono / 16-bit PCM at a requested sample rate and hands each
  * chunk to [onChunk] on a background thread.
+ *
+ *  - [Source.MIC] records the microphone.
+ *  - [Source.SYSTEM] records other apps' playback via [MediaProjection]
+ *    (Android 10+). NOTE: Android only allows capturing MEDIA/GAME audio —
+ *    voice-call audio (Zoom/Meet/phone) and DRM content cannot be captured.
  */
 class AudioCapture(
+    private val source: Source,
+    private val sampleRate: Int,
+    private val mediaProjection: MediaProjection?,
     private val onChunk: (ByteArray) -> Unit,
     private val onError: (String) -> Unit,
 ) {
+    enum class Source { MIC, SYSTEM }
+
     companion object {
         private const val TAG = "AudioCapture"
-        const val SAMPLE_RATE = 16000
     }
 
-    @Volatile
-    private var running = false
+    @Volatile private var running = false
     private var recorder: AudioRecord? = null
     private var worker: Thread? = null
 
-    @SuppressLint("MissingPermission") // RECORD_AUDIO is requested by the Activity before start()
+    @SuppressLint("MissingPermission") // RECORD_AUDIO requested by the caller before start()
     fun start() {
         if (running) return
 
         val minBuf = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
+            sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
         if (minBuf <= 0) {
-            onError("Microphone not available on this device")
+            onError("Audio not available on this device")
             return
         }
-        // Read ~100 ms at a time; use a comfortably large recorder buffer.
-        val readSize = SAMPLE_RATE / 10 * 2 // 0.1s * 16000 * 2 bytes
+        // ~60 ms per read for low latency.
+        val readSize = sampleRate / 1000 * 60 * 2
         val bufferSize = maxOf(minBuf, readSize * 4)
 
-        val rec = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize
-        )
+        val rec = try {
+            buildRecorder(bufferSize)
+        } catch (e: Exception) {
+            onError("Failed to start audio: ${e.message}")
+            return
+        }
+        if (rec == null) return
         if (rec.state != AudioRecord.STATE_INITIALIZED) {
             rec.release()
-            onError("Failed to initialize the microphone")
+            onError("Failed to initialize audio capture")
             return
         }
 
@@ -69,6 +78,44 @@ class AudioCapture(
                 } else if (read < 0) {
                     Log.w(TAG, "AudioRecord.read returned $read")
                 }
+            }
+        }
+    }
+
+    private fun buildRecorder(bufferSize: Int): AudioRecord? {
+        val format = AudioFormat.Builder()
+            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(sampleRate)
+            .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+            .build()
+
+        return when (source) {
+            Source.MIC ->
+                AudioRecord.Builder()
+                    .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                    .setAudioFormat(format)
+                    .setBufferSizeInBytes(bufferSize)
+                    .build()
+
+            Source.SYSTEM -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    onError("System audio capture needs Android 10 or newer")
+                    return null
+                }
+                val projection = mediaProjection ?: run {
+                    onError("System audio permission was not granted")
+                    return null
+                }
+                val captureConfig = AudioPlaybackCaptureConfiguration.Builder(projection)
+                    .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                    .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                    .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                    .build()
+                AudioRecord.Builder()
+                    .setAudioFormat(format)
+                    .setBufferSizeInBytes(bufferSize)
+                    .setAudioPlaybackCaptureConfig(captureConfig)
+                    .build()
             }
         }
     }

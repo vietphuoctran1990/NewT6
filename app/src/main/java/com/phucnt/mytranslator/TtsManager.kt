@@ -6,27 +6,35 @@ import android.util.Log
 import java.util.Locale
 
 /**
- * Speaks the translated text aloud using Android's built-in Text-to-Speech.
- * This is the "voice" half of the app — the subtitle text from Soniox is
- * queued here and read out in the target language.
+ * Speaks translated text aloud using Android's built-in Text-to-Speech.
+ * Pre-warms on init and supports a configurable speech rate so audio keeps up
+ * with live translation.
  */
 class TtsManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val tts = TextToSpeech(context.applicationContext, this)
     private var ready = false
     private var pendingLocale: Locale? = null
+    private var rate = 1.0f
 
     @Volatile var enabled = false
 
     override fun onInit(status: Int) {
         ready = status == TextToSpeech.SUCCESS
-        if (ready) pendingLocale?.let { applyLocale(it) }
+        if (ready) {
+            tts.setSpeechRate(rate)
+            pendingLocale?.let { applyLocale(it) }
+        }
     }
 
-    /** Set the spoken language from a Soniox language code (e.g. "vi", "zh"). */
     fun setLanguageByCode(code: String) {
         val locale = localeFor(code)
         if (ready) applyLocale(locale) else pendingLocale = locale
+    }
+
+    fun setRate(value: Float) {
+        rate = value.coerceIn(0.5f, 2.0f)
+        if (ready) tts.setSpeechRate(rate)
     }
 
     private fun applyLocale(locale: Locale) {
@@ -36,7 +44,6 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    /** Queue text to be spoken. No-op when disabled. */
     fun speak(text: String) {
         if (!enabled || !ready || text.isBlank()) return
         tts.speak(text, TextToSpeech.QUEUE_ADD, null, "tr-${System.nanoTime()}")

@@ -1,11 +1,17 @@
 package com.phucnt.mytranslator
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.SeekBar
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -15,189 +21,220 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private lateinit var prefs: Prefs
-    private lateinit var tts: TtsManager
 
-    private var soniox: SonioxClient? = null
-    private var audio: AudioCapture? = null
-    private var running = false
+    private var overlayRequested = false
+    private var notifRequested = false
 
-    private val requestMic =
+    // ── Permission / projection launchers ──────────────────────────────
+    private val overlayLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { tryStart() }
+
+    private val notifLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { tryStart() }
+
+    private val micLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startTranslating() else setStatus("Microphone permission is required to translate.")
+            if (granted) tryStart() else setStatus("Microphone permission is required.")
+        }
+
+    private val projectionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data
+            if (result.resultCode == RESULT_OK && data != null) {
+                startServiceSystem(result.resultCode, data)
+            } else {
+                setStatus("System audio capture was not granted.")
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
-
         prefs = Prefs(this)
-        tts = TtsManager(this)
 
         setupSpinners()
         restoreState()
 
-        b.startStopButton.setOnClickListener { if (running) stopTranslating() else onStartPressed() }
-        b.clearButton.setOnClickListener { clearTranscript() }
-        b.ttsSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.ttsEnabled = checked
-            tts.enabled = checked
-            if (!checked) tts.stop()
+        b.startStopButton.setOnClickListener {
+            if (EngineBus.state.running) stopService() else onStartPressed()
         }
+        b.clearButton.setOnClickListener {
+            b.translationText.text = ""; b.provisionalText.text = ""; b.sourceText.text = ""
+        }
+        b.ttsSwitch.setOnCheckedChangeListener { _, c -> prefs.ttsEnabled = c }
+        b.overlaySwitch.setOnCheckedChangeListener { _, c -> prefs.overlayEnabled = c }
+        b.ttsSpeed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                prefs.ttsRatePercent = 50 + p
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
     }
+
+    override fun onResume() {
+        super.onResume()
+        EngineBus.listener = { state -> runOnUiThread { render(state) } }
+        render(EngineBus.state)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        EngineBus.listener = null
+    }
+
+    // ── Setup / restore ────────────────────────────────────────────────
 
     private fun setupSpinners() {
-        b.sourceSpinner.adapter = languageAdapter(Languages.source.map { it.name })
-        b.targetSpinner.adapter = languageAdapter(Languages.target.map { it.name })
+        b.engineSpinner.adapter = adapter(
+            listOf(getString(R.string.engine_soniox), getString(R.string.engine_openai))
+        )
+        b.sourceAudioSpinner.adapter = adapter(
+            listOf(getString(R.string.source_mic), getString(R.string.source_system))
+        )
+        b.sourceSpinner.adapter = adapter(Languages.source.map { it.name })
+        b.targetSpinner.adapter = adapter(Languages.target.map { it.name })
 
-        b.sourceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                prefs.sourceLang = Languages.source[pos].code
-            }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+        b.engineSpinner.onItemSelectedListener = onSelect { pos ->
+            prefs.engine = if (pos == 1) Prefs.ENGINE_OPENAI else Prefs.ENGINE_SONIOX
         }
-        b.targetSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                val code = Languages.target[pos].code
-                prefs.targetLang = code
-                tts.setLanguageByCode(code)
-            }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+        b.sourceAudioSpinner.onItemSelectedListener = onSelect { pos ->
+            prefs.audioSource = if (pos == 1) Prefs.SOURCE_SYSTEM else Prefs.SOURCE_MIC
+        }
+        b.sourceSpinner.onItemSelectedListener = onSelect { pos ->
+            prefs.sourceLang = Languages.source[pos].code
+        }
+        b.targetSpinner.onItemSelectedListener = onSelect { pos ->
+            prefs.targetLang = Languages.target[pos].code
         }
     }
 
-    private fun languageAdapter(names: List<String>) =
-        ArrayAdapter(this, android.R.layout.simple_spinner_item, names).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-
     private fun restoreState() {
-        b.apiKeyInput.setText(prefs.apiKey)
+        b.sonioxKeyInput.setText(prefs.apiKey)
+        b.openaiKeyInput.setText(prefs.openAiKey)
+        b.engineSpinner.setSelection(if (prefs.engine == Prefs.ENGINE_OPENAI) 1 else 0)
+        b.sourceAudioSpinner.setSelection(if (prefs.audioSource == Prefs.SOURCE_SYSTEM) 1 else 0)
         b.sourceSpinner.setSelection(Languages.indexOfCode(Languages.source, prefs.sourceLang))
         b.targetSpinner.setSelection(Languages.indexOfCode(Languages.target, prefs.targetLang))
         b.ttsSwitch.isChecked = prefs.ttsEnabled
-        tts.enabled = prefs.ttsEnabled
-        tts.setLanguageByCode(prefs.targetLang)
+        b.overlaySwitch.isChecked = prefs.overlayEnabled
+        b.ttsSpeed.progress = (prefs.ttsRatePercent - 50).coerceIn(0, 150)
     }
+
+    private fun adapter(items: List<String>) =
+        ArrayAdapter(this, android.R.layout.simple_spinner_item, items).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+
+    private fun onSelect(onPos: (Int) -> Unit) = object : AdapterView.OnItemSelectedListener {
+        override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) = onPos(pos)
+        override fun onNothingSelected(p: AdapterView<*>?) {}
+    }
+
+    // ── Start flow ─────────────────────────────────────────────────────
 
     private fun onStartPressed() {
-        prefs.apiKey = b.apiKeyInput.text.toString().trim()
-        if (prefs.apiKey.isBlank()) {
-            setStatus("Enter your Soniox API key first.")
+        prefs.apiKey = b.sonioxKeyInput.text.toString().trim()
+        prefs.openAiKey = b.openaiKeyInput.text.toString().trim()
+
+        val keyOk = if (prefs.engine == Prefs.ENGINE_OPENAI) prefs.openAiKey.isNotBlank()
+        else prefs.apiKey.isNotBlank()
+        if (!keyOk) {
+            setStatus("Enter the API key for the selected engine.")
             return
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED
+        overlayRequested = false
+        notifRequested = false
+        tryStart()
+    }
+
+    /** Re-entrant: requests one missing prerequisite at a time, then launches. */
+    private fun tryStart() {
+        if (prefs.overlayEnabled && !Settings.canDrawOverlays(this) && !overlayRequested) {
+            overlayRequested = true
+            setStatus("Grant ‘display over other apps’, then press Start again.")
+            overlayLauncher.launch(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED && !notifRequested
         ) {
-            startTranslating()
-        } else {
-            requestMic.launch(Manifest.permission.RECORD_AUDIO)
+            notifRequested = true
+            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
         }
-    }
-
-    private fun startTranslating() {
-        if (running) return
-        running = true
-        setControlsRunning(true)
-
-        val config = SonioxClient.Config(
-            apiKey = prefs.apiKey,
-            sourceLanguage = prefs.sourceLang,
-            targetLanguage = prefs.targetLang,
-        )
-
-        val client = SonioxClient(
-            onStatus = { status -> runOnUiThread { onStatus(status) } },
-            onOriginal = { text -> runOnUiThread { appendSource(text) } },
-            onTranslation = { text ->
-                runOnUiThread { appendTranslation(text) }
-                tts.speak(text)
-            },
-            onProvisional = { text -> runOnUiThread { b.provisionalText.text = text } },
-            onError = { msg -> runOnUiThread { setStatus(msg) } },
-        )
-        soniox = client
-        client.connect(config)
-
-        val capture = AudioCapture(
-            onChunk = { chunk -> client.sendAudio(chunk) },
-            onError = { msg -> runOnUiThread { setStatus(msg); stopTranslating() } },
-        )
-        audio = capture
-        capture.start()
-    }
-
-    private fun stopTranslating() {
-        if (!running) return
-        running = false
-        audio?.stop()
-        audio = null
-        soniox?.disconnect()
-        soniox = null
-        tts.stop()
-        setControlsRunning(false)
-        b.provisionalText.text = ""
-        setStatus("Stopped.")
-    }
-
-    private fun onStatus(status: SonioxClient.Status) {
-        when (status) {
-            SonioxClient.Status.CONNECTING -> setStatus("Connecting…")
-            SonioxClient.Status.CONNECTED -> setStatus(getString(R.string.waiting))
-            SonioxClient.Status.DISCONNECTED -> setStatus("Disconnected.")
-            SonioxClient.Status.ERROR -> {} // message comes through onError
+        if (prefs.audioSource == Prefs.SOURCE_MIC &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
         }
-    }
-
-    private fun appendTranslation(text: String) {
-        appendTo(b.translationText, text)
-        scrollToBottom()
-    }
-
-    private fun appendSource(text: String) {
-        appendTo(b.sourceText, text)
-        scrollToBottom()
-    }
-
-    private fun appendTo(view: android.widget.TextView, text: String) {
-        val existing = view.text?.toString().orEmpty()
-        val sep = if (existing.isEmpty() || existing.endsWith(" ")) "" else " "
-        view.text = existing + sep + text.trim()
-    }
-
-    private fun clearTranscript() {
-        b.translationText.text = ""
-        b.sourceText.text = ""
-        b.provisionalText.text = ""
-    }
-
-    private fun scrollToBottom() {
-        b.scrollView.post {
-            if (isAtBottomZone()) b.scrollView.fullScroll(View.FOCUS_DOWN)
+        if (prefs.audioSource == Prefs.SOURCE_SYSTEM) {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            projectionLauncher.launch(mpm.createScreenCaptureIntent())
+            return
         }
+        startServiceMic()
     }
 
-    /** Only auto-scroll when the user is already near the bottom (smart scroll). */
-    private fun isAtBottomZone(): Boolean {
-        val child = b.scrollView.getChildAt(0) ?: return true
-        val diff = child.bottom - (b.scrollView.height + b.scrollView.scrollY)
-        return diff <= child.height // generous threshold; jumps to bottom in normal use
+    private fun startServiceMic() {
+        val intent = Intent(this, TranslationService::class.java).setAction(TranslationService.ACTION_START)
+        ContextCompat.startForegroundService(this, intent)
+        setStatus("Starting…")
     }
 
-    private fun setControlsRunning(isRunning: Boolean) {
-        b.startStopButton.text = getString(if (isRunning) R.string.stop else R.string.start)
-        b.apiKeyInput.isEnabled = !isRunning
-        b.sourceSpinner.isEnabled = !isRunning
-        b.targetSpinner.isEnabled = !isRunning
+    private fun startServiceSystem(resultCode: Int, data: Intent) {
+        val intent = Intent(this, TranslationService::class.java)
+            .setAction(TranslationService.ACTION_START)
+            .putExtra(TranslationService.EXTRA_RESULT_CODE, resultCode)
+            .putExtra(TranslationService.EXTRA_RESULT_DATA, data)
+        ContextCompat.startForegroundService(this, intent)
+        setStatus("Starting…")
+    }
+
+    private fun stopService() {
+        val intent = Intent(this, TranslationService::class.java).setAction(TranslationService.ACTION_STOP)
+        startService(intent)
+    }
+
+    // ── Rendering ──────────────────────────────────────────────────────
+
+    private fun render(s: EngineBus.State) {
+        b.startStopButton.text = getString(if (s.running) R.string.stop else R.string.start)
+        setControlsEnabled(!s.running)
+
+        val statusLine = s.error ?: when (s.status) {
+            "connecting" -> "Connecting…"
+            "connected" -> getString(R.string.waiting)
+            "disconnected", "stopped" -> "Stopped."
+            else -> getString(R.string.status_idle)
+        }
+        b.statusText.text = statusLine
+
+        b.translationText.text = s.translation
+        b.provisionalText.text = s.provisionalTranslation
+        b.sourceText.text = listOf(s.source, s.provisionalSource).filter { it.isNotBlank() }.joinToString(" ")
+        b.scrollView.post { b.scrollView.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun setControlsEnabled(enabled: Boolean) {
+        b.engineSpinner.isEnabled = enabled
+        b.sourceAudioSpinner.isEnabled = enabled
+        b.sourceSpinner.isEnabled = enabled
+        b.targetSpinner.isEnabled = enabled
+        b.sonioxKeyInput.isEnabled = enabled
+        b.openaiKeyInput.isEnabled = enabled
     }
 
     private fun setStatus(text: String) {
         b.statusText.text = text
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if (running) stopTranslating()
-        tts.shutdown()
     }
 }

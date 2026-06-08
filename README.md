@@ -1,78 +1,83 @@
 # My Translator (Android)
 
-A real-time **speech translation** app for Android. It listens through the
-phone's microphone, transcribes and translates the speech in the cloud, shows
-the result as on-screen **subtitles**, and optionally reads the translation
-aloud as **voice**.
+A real-time **speech translation** app for Android. It listens to the
+microphone *or* the phone's media audio, translates in the cloud, shows the
+result as on-screen **subtitles** (including a **floating overlay over other
+apps**), and reads the translation aloud as **voice**.
 
-It is an Android adaptation of the desktop
-[my-translator](https://github.com/phuc-nt/my-translator) (a Tauri app for
-macOS/Windows). The desktop app relies on platform-specific system-audio
-capture; this version is a native Android (Kotlin) app that captures the mic
-and uses the same proven cloud engine.
+Android adaptation of the desktop
+[my-translator](https://github.com/phuc-nt/my-translator) (Tauri, macOS/Windows).
 
 ## How it works
 
 ```
-Microphone ──16 kHz PCM──▶ Soniox real-time WebSocket ──▶ subtitle (source + translation)
-                                                       └─▶ Android Text-to-Speech ──▶ 🔊 voice
+Mic / System audio ──PCM──▶ Engine ──▶ subtitles (in-app + floating overlay)
+                            │
+                            ├─ Soniox  → text, + Android TTS voice
+                            └─ OpenAI  → text + native translated voice
 ```
 
-- **Speech-to-text + translation:** [Soniox](https://soniox.com) real-time
-  WebSocket (`stt-rt-v4`) — returns the original transcript *and* the
-  translation in a single stream. 70+ source languages, one-way translation to
-  the target language you pick.
-- **Voice output:** Android's built-in Text-to-Speech reads the translation
-  aloud in the target language (toggle on/off).
+Everything runs inside a **foreground service**, so translation continues while
+you switch to YouTube, a browser, or any other app and read the floating
+subtitles on top.
+
+## Features
+
+- **Two cloud engines:**
+  - **Soniox** (`stt-rt-v4`) — STT + translation in one stream; voice via
+    Android Text-to-Speech. 70+ languages, ~$0.12/hr.
+  - **OpenAI Realtime** (`gpt-realtime-translate`) — returns translated text
+    *and* native translated speech in one stream (lowest latency, ~$4/hr).
+- **Floating subtitles** over other apps (draggable, font +/−).
+- **Audio source: Microphone or System audio.**
+  - ⚠️ Android only allows capturing **media/game** audio (YouTube, video,
+    music). It **cannot** capture voice-call audio (Zoom/Meet/phone) or DRM
+    content (Netflix) — a platform limitation, unlike the desktop app.
+- **Low-latency tuning:** live (provisional) subtitles shown as you speak,
+  shorter endpoint delay, adjustable voice speed, small audio chunks.
 
 ## Setup
 
-1. Get a Soniox API key (free credits to start) at
-   [console.soniox.com](https://console.soniox.com).
-2. Install the APK (see below), open the app, paste your API key.
-3. Pick the **From** (source, or auto-detect) and **To** (target) languages.
-4. Optionally enable **Speak translation (voice)**.
-5. Press **Start** and grant microphone permission.
+1. Get an API key:
+   - Soniox: [console.soniox.com](https://console.soniox.com), or
+   - OpenAI: [platform.openai.com](https://platform.openai.com).
+2. Install the APK (below), open the app, pick the **Engine**, paste its key.
+3. Choose **Audio source** (Microphone / System audio), **From** → **To**.
+4. Optionally enable **Speak translation (voice)** and **Floating subtitles**.
+5. Press **Start** and grant the requested permissions (microphone /
+   notifications / display-over-other-apps / screen-capture for system audio).
 
-> Your audio goes directly from the phone to Soniox using your own API key.
-> The key is stored locally on the device only.
+> Audio goes directly from the phone to the engine using your own API key,
+> stored locally on the device only.
 
-## Getting the APK
+## Getting the APK (GitHub Actions)
 
-This repository builds the APK automatically with **GitHub Actions**
-(`.github/workflows/android-build.yml`):
-
-1. Push to the repo (or run the *Build Android APK* workflow manually from the
-   Actions tab).
-2. Open the completed workflow run → **Artifacts** → download
-   `my-translator-debug-apk`.
-3. Unzip and install `app-debug.apk` on your phone (enable *Install unknown
-   apps* for your file manager / browser).
+1. Repo → **Actions** tab → open a successful **Build Android APK** run.
+2. **Artifacts** → download **`my-translator-debug-apk`** → unzip →
+   install `app-debug.apk` (enable *Install unknown apps*).
 
 ## Build from source
 
 ```bash
-git clone <this-repo>
-cd <this-repo>
-./gradlew assembleDebug
-# APK at app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug   # → app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Requirements: JDK 17, Android SDK (API 34). Android Studio handles both.
-
-- **minSdk:** 26 (Android 8.0+)
-- **targetSdk / compileSdk:** 34
+Requirements: JDK 17, Android SDK (API 34). **minSdk 26** (Android 8.0+).
 
 ## Project layout
 
 ```
 app/src/main/java/com/phucnt/mytranslator/
-  MainActivity.kt    UI, wiring, permissions, smart-scroll subtitles
-  SonioxClient.kt    Soniox real-time STT + translation over WebSocket
-  AudioCapture.kt    16 kHz mono PCM microphone capture
-  TtsManager.kt      Android Text-to-Speech (voice output)
-  Languages.kt       Language picker list
-  Prefs.kt           Persisted settings
+  MainActivity.kt          UI, settings, permission flows
+  TranslationService.kt    Foreground service orchestrating the pipeline
+  TranslationEngine.kt     Engine interface + listener
+  SonioxClient.kt          Soniox real-time STT + translation
+  OpenAiRealtimeClient.kt  OpenAI Realtime (text + native voice)
+  AudioCapture.kt          Mic / system (MediaProjection) PCM capture
+  AudioTrackPlayer.kt      Plays OpenAI's native voice
+  TtsManager.kt            Android Text-to-Speech (voice for Soniox)
+  OverlayController.kt      Floating subtitle window
+  EngineBus.kt / Prefs.kt / Languages.kt
 ```
 
 ## License

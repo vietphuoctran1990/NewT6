@@ -1,13 +1,26 @@
 <resources>
     <string name="app_name">My Translator</string>
-    <string name="api_key_hint">Soniox API key</string>
+    <string name="soniox_key_hint">Soniox API key</string>
+    <string name="openai_key_hint">OpenAI API key</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
     <string name="source_language">From</string>
     <string name="target_language">To</string>
     <string name="speak_translation">Speak translation (voice)</string>
-    <string name="status_idle">Idle — enter your Soniox API key and press Start</string>
-    <string name="get_key">Get a free Soniox API key at soniox.com</string>
+    <string name="floating_subtitles">Floating subtitles (overlay)</string>
+    <string name="status_idle">Idle — choose an engine, enter your API key, then Start</string>
+    <string name="get_key">Soniox: console.soniox.com · OpenAI: platform.openai.com</string>
     <string name="clear">Clear</string>
     <string name="waiting">Listening…</string>
+    <string name="engine">Engine</string>
+    <string name="audio_source">Audio source</string>
+    <string name="engine_soniox">Soniox (subtitle + TTS voice)</string>
+    <string name="engine_openai">OpenAI Realtime (text + native voice)</string>
+    <string name="source_mic">Microphone</string>
+    <string name="source_system">System audio (media only)</string>
+    <string name="tts_speed">Voice speed</string>
+    <string name="notif_title">My Translator is running</string>
+    <string name="notif_text">Listening and translating…</string>
+    <string name="notif_channel">Translation</string>
+    <string name="system_audio_note">System audio captures media/YouTube only — not voice calls (Zoom/Meet) or DRM (Netflix).</string>
 </resources>
