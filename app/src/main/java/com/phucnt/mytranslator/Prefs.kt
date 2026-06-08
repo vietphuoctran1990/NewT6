@@ -21,6 +21,20 @@ class Prefs(context: Context) {
         get() = sp.getString("openai_key", "") ?: ""
         set(v) = sp.edit().putString("openai_key", v).apply()
 
+    var deepSeekKey: String
+        get() = sp.getString("deepseek_key", "") ?: ""
+        set(v) = sp.edit().putString("deepseek_key", v).apply()
+
+    /** When on (Soniox engine), DeepSeek re-translates each final segment for fluency. */
+    var deepSeekRefine: Boolean
+        get() = sp.getBoolean("deepseek_refine", false)
+        set(v) = sp.edit().putBoolean("deepseek_refine", v).apply()
+
+    /** Optional glossary, one "source = target" per line, fed to DeepSeek. */
+    var glossary: String
+        get() = sp.getString("glossary", "") ?: ""
+        set(v) = sp.edit().putString("glossary", v).apply()
+
     var engine: String
         get() = sp.getString("engine", ENGINE_SONIOX) ?: ENGINE_SONIOX
         set(v) = sp.edit().putString("engine", v).apply()

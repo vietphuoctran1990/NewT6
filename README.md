@@ -28,6 +28,10 @@ subtitles on top.
     Android Text-to-Speech. 70+ languages, ~$0.12/hr.
   - **OpenAI Realtime** (`gpt-realtime-translate`) — returns translated text
     *and* native translated speech in one stream (lowest latency, ~$4/hr).
+- **DeepSeek refinement (optional, Soniox engine):** Soniox shows a fast draft
+  subtitle, then DeepSeek (`deepseek-chat`) re-translates the segment into more
+  fluent target-language text — applying your glossary — and that improved
+  version is what gets spoken. Each segment upgrades in place.
 - **Floating subtitles** over other apps (draggable, font +/−).
 - **Audio source: Microphone or System audio.**
   - ⚠️ Android only allows capturing **media/game** audio (YouTube, video,
@@ -73,6 +77,7 @@ app/src/main/java/com/phucnt/mytranslator/
   TranslationEngine.kt     Engine interface + listener
   SonioxClient.kt          Soniox real-time STT + translation
   OpenAiRealtimeClient.kt  OpenAI Realtime (text + native voice)
+  DeepSeekRefiner.kt       DeepSeek re-translation/refinement of Soniox segments
   AudioCapture.kt          Mic / system (MediaProjection) PCM capture
   AudioTrackPlayer.kt      Plays OpenAI's native voice
   TtsManager.kt            Android Text-to-Speech (voice for Soniox)

@@ -44,6 +44,17 @@
                 android:textColorHint="@color/muted"
                 android:maxLines="1" />
 
+            <EditText
+                android:id="@+id/deepseekKeyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/deepseek_key_hint"
+                android:inputType="textPassword"
+                android:importantForAutofill="no"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/muted"
+                android:maxLines="1" />
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -94,6 +105,28 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1" />
             </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/refineSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/deepseek_refine"
+                android:textColor="@color/on_surface"
+                android:paddingTop="8dp" />
+
+            <EditText
+                android:id="@+id/glossaryInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/glossary_hint"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:importantForAutofill="no"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/muted"
+                android:textSize="13sp" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/ttsSwitch"

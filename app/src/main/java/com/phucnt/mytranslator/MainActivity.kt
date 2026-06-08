@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         }
         b.ttsSwitch.setOnCheckedChangeListener { _, c -> prefs.ttsEnabled = c }
         b.overlaySwitch.setOnCheckedChangeListener { _, c -> prefs.overlayEnabled = c }
+        b.refineSwitch.setOnCheckedChangeListener { _, c -> prefs.deepSeekRefine = c }
         b.ttsSpeed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                 prefs.ttsRatePercent = 50 + p
@@ -113,6 +114,9 @@ class MainActivity : AppCompatActivity() {
     private fun restoreState() {
         b.sonioxKeyInput.setText(prefs.apiKey)
         b.openaiKeyInput.setText(prefs.openAiKey)
+        b.deepseekKeyInput.setText(prefs.deepSeekKey)
+        b.glossaryInput.setText(prefs.glossary)
+        b.refineSwitch.isChecked = prefs.deepSeekRefine
         b.engineSpinner.setSelection(if (prefs.engine == Prefs.ENGINE_OPENAI) 1 else 0)
         b.sourceAudioSpinner.setSelection(if (prefs.audioSource == Prefs.SOURCE_SYSTEM) 1 else 0)
         b.sourceSpinner.setSelection(Languages.indexOfCode(Languages.source, prefs.sourceLang))
@@ -137,6 +141,8 @@ class MainActivity : AppCompatActivity() {
     private fun onStartPressed() {
         prefs.apiKey = b.sonioxKeyInput.text.toString().trim()
         prefs.openAiKey = b.openaiKeyInput.text.toString().trim()
+        prefs.deepSeekKey = b.deepseekKeyInput.text.toString().trim()
+        prefs.glossary = b.glossaryInput.text.toString().trim()
 
         val keyOk = if (prefs.engine == Prefs.ENGINE_OPENAI) prefs.openAiKey.isNotBlank()
         else prefs.apiKey.isNotBlank()
@@ -232,6 +238,9 @@ class MainActivity : AppCompatActivity() {
         b.targetSpinner.isEnabled = enabled
         b.sonioxKeyInput.isEnabled = enabled
         b.openaiKeyInput.isEnabled = enabled
+        b.deepseekKeyInput.isEnabled = enabled
+        b.glossaryInput.isEnabled = enabled
+        b.refineSwitch.isEnabled = enabled
     }
 
     private fun setStatus(text: String) {

@@ -2,6 +2,9 @@
     <string name="app_name">My Translator</string>
     <string name="soniox_key_hint">Soniox API key</string>
     <string name="openai_key_hint">OpenAI API key</string>
+    <string name="deepseek_key_hint">DeepSeek API key (optional)</string>
+    <string name="deepseek_refine">Refine translation with DeepSeek (Soniox engine)</string>
+    <string name="glossary_hint">Glossary — one "source = target" per line (optional)</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
     <string name="source_language">From</string>

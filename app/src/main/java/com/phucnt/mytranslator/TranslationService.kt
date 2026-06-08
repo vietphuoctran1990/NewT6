@@ -45,11 +45,13 @@ class TranslationService : Service(), EngineListener {
     private var projection: MediaProjection? = null
 
     private val sourceTranscript = StringBuilder()
-    private val translationTranscript = StringBuilder()
+    private val translationSegments = mutableListOf<String>()
     private var provSource = ""
     private var provTranslation = ""
+    private var lastSourceSegment = ""
 
     private var ttsForVoice = false // Soniox: speak via TTS. OpenAI: native audio instead.
+    private var refiner: DeepSeekRefiner? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -65,8 +67,8 @@ class TranslationService : Service(), EngineListener {
 
     private fun startPipeline(intent: Intent?) {
         val prefs = Prefs(this)
-        sourceTranscript.clear(); translationTranscript.clear()
-        provSource = ""; provTranslation = ""
+        sourceTranscript.clear(); translationSegments.clear()
+        provSource = ""; provTranslation = ""; lastSourceSegment = ""
 
         val useOpenAi = prefs.engine == Prefs.ENGINE_OPENAI
         val voiceOn = prefs.ttsEnabled
@@ -89,6 +91,13 @@ class TranslationService : Service(), EngineListener {
                 it.enabled = true
                 it.setRate(prefs.ttsRatePercent / 100f)
                 it.setLanguageByCode(prefs.targetLang)
+            }
+            if (prefs.deepSeekRefine && prefs.deepSeekKey.isNotBlank()) {
+                refiner = DeepSeekRefiner(
+                    apiKey = prefs.deepSeekKey,
+                    targetLanguageName = Languages.nameForCode(prefs.targetLang),
+                    glossary = prefs.glossary,
+                )
             }
             SonioxClient(
                 SonioxClient.Config(
@@ -148,6 +157,7 @@ class TranslationService : Service(), EngineListener {
         player?.stop(); player = null
         overlay?.hide(); overlay = null
         projection?.stop(); projection = null
+        refiner?.shutdown(); refiner = null
         EngineBus.publish(EngineBus.State(running = false, status = "stopped"))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -161,6 +171,7 @@ class TranslationService : Service(), EngineListener {
         player?.stop()
         overlay?.hide()
         projection?.stop()
+        refiner?.shutdown()
     }
 
     // ─── EngineListener ──────────────────────────────────────────────
@@ -170,6 +181,7 @@ class TranslationService : Service(), EngineListener {
     override fun onSourceText(text: String, isFinal: Boolean) {
         if (isFinal) {
             appendWithSpace(sourceTranscript, text)
+            lastSourceSegment = text
             provSource = ""
         } else {
             provSource = text
@@ -178,15 +190,38 @@ class TranslationService : Service(), EngineListener {
     }
 
     override fun onTranslationText(text: String, isFinal: Boolean) {
-        if (isFinal) {
-            appendWithSpace(translationTranscript, text)
-            provTranslation = ""
-            if (ttsForVoice) tts?.speak(text)
-        } else {
+        if (!isFinal) {
             provTranslation = text
+            overlay?.update("", text)
+            publishText()
+            return
         }
-        overlay?.update(if (isFinal) text else "", if (isFinal) "" else text)
+        provTranslation = ""
+        val r = refiner
+        if (r == null) {
+            synchronized(translationSegments) { translationSegments.add(text) }
+            if (ttsForVoice) tts?.speak(text)
+            overlay?.update(text, "")
+            publishText()
+            return
+        }
+        // Refine: show Soniox's draft instantly, then upgrade the segment in place
+        // (and speak the improved version) when DeepSeek returns.
+        val index = synchronized(translationSegments) {
+            translationSegments.add(text); translationSegments.size - 1
+        }
+        overlay?.update(text, "")
         publishText()
+        r.refine(lastSourceSegment, text) { improved ->
+            main.post {
+                synchronized(translationSegments) {
+                    if (index < translationSegments.size) translationSegments[index] = improved
+                }
+                if (ttsForVoice) tts?.speak(improved)
+                overlay?.update(improved, "")
+                publishText()
+            }
+        }
     }
 
     override fun onAudioChunk(pcmBase64: String) {
@@ -196,10 +231,11 @@ class TranslationService : Service(), EngineListener {
     override fun onError(message: String) = EngineBus.update { it.copy(error = message) }
 
     private fun publishText() {
+        val translation = synchronized(translationSegments) { translationSegments.joinToString(" ") }
         EngineBus.update {
             it.copy(
                 source = sourceTranscript.toString(),
-                translation = translationTranscript.toString(),
+                translation = translation,
                 provisionalSource = provSource,
                 provisionalTranslation = provTranslation,
             )

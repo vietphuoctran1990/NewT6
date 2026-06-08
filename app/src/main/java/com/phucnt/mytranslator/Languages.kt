@@ -18,6 +18,10 @@ object Languages {
         val i = list.indexOfFirst { it.code == code }
         return if (i >= 0) i else 0
     }
+
+    /** Human-readable language name for a code (used in the DeepSeek prompt). */
+    fun nameForCode(code: String): String =
+        COMMON_AND_REST.firstOrNull { it.code == code }?.name ?: code
 }
 
 private val COMMON_AND_REST: List<Language> = listOf(
