@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">My Translator</string>
+    <string name="api_key_hint">Soniox API key</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="source_language">From</string>
+    <string name="target_language">To</string>
+    <string name="speak_translation">Speak translation (voice)</string>
+    <string name="status_idle">Idle — enter your Soniox API key and press Start</string>
+    <string name="get_key">Get a free Soniox API key at soniox.com</string>
+    <string name="clear">Clear</string>
+    <string name="waiting">Listening…</string>
+</resources>
