@@ -100,6 +100,7 @@ class SonioxClient(
 
     private val wsListener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            ws = webSocket
             webSocket.send(buildConfig().toString())
             connected = true
             reconnectAttempts = 0
@@ -108,6 +109,7 @@ class SonioxClient(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (webSocket !== ws) return // stale socket from before a reconnect
             try {
                 val json = JSONObject(text)
                 if (json.has("error_code")) handleApiError(json) else handleResponse(json)
@@ -117,12 +119,14 @@ class SonioxClient(
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if (webSocket !== ws) return
             Log.e(TAG, "WebSocket failure", t)
             connected = false
             if (!intentionalDisconnect) tryReconnect(t.message ?: "Connection error")
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            if (webSocket !== ws) return
             connected = false
             stopKeepalive()
             if (intentionalDisconnect) {

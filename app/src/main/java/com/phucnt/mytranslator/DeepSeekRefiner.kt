@@ -52,14 +52,18 @@ class DeepSeekRefiner(
      * background thread with the improved text, or the draft if refinement fails.
      */
     fun refine(source: String, draft: String, onResult: (String) -> Unit) {
-        executor.execute {
-            val improved = try {
-                request(source, draft) ?: draft
-            } catch (e: Exception) {
-                Log.w(TAG, "Refine failed, using draft", e)
-                draft
+        try {
+            executor.execute {
+                val improved = try {
+                    request(source, draft) ?: draft
+                } catch (e: Exception) {
+                    Log.w(TAG, "Refine failed, using draft", e)
+                    draft
+                }
+                onResult(improved.ifBlank { draft })
             }
-            onResult(improved.ifBlank { draft })
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // shutdown raced a late segment — keep the draft, nothing to do
         }
     }
 

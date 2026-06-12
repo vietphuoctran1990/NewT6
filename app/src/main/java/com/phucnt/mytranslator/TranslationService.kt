@@ -26,13 +26,13 @@ class TranslationService : Service(), EngineListener {
     companion object {
         const val ACTION_START = "com.phucnt.mytranslator.START"
         const val ACTION_STOP = "com.phucnt.mytranslator.STOP"
+        const val ACTION_UPDATE = "com.phucnt.mytranslator.UPDATE"
+        const val ACTION_CLEAR = "com.phucnt.mytranslator.CLEAR"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
 
         private const val CHANNEL_ID = "translation"
         private const val NOTIF_ID = 1
-
-        fun isRunning() = EngineBus.state.running
     }
 
     private val main = Handler(Looper.getMainLooper())
@@ -53,21 +53,30 @@ class TranslationService : Service(), EngineListener {
     private var ttsForVoice = false // Soniox: speak via TTS. OpenAI: native audio instead.
     private var refiner: DeepSeekRefiner? = null
 
+    @Volatile private var pipelineActive = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopEverything()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> stopEverything()
+            ACTION_UPDATE -> if (pipelineActive) applyLiveSettings() else stopSelf()
+            ACTION_CLEAR -> if (pipelineActive) clearTranscript() else stopSelf()
+            else -> {
+                if (!pipelineActive) { // ignore duplicate starts (double-tap, re-delivery)
+                    startForegroundNotification(intent)
+                    startPipeline(intent)
+                }
+            }
         }
-        startForegroundNotification(intent)
-        startPipeline(intent)
         return START_NOT_STICKY
     }
 
     private fun startPipeline(intent: Intent?) {
         val prefs = Prefs(this)
-        sourceTranscript.clear(); translationSegments.clear()
+        pipelineActive = true
+        sourceTranscript.clear()
+        synchronized(translationSegments) { translationSegments.clear() }
         provSource = ""; provTranslation = ""; lastSourceSegment = ""
 
         val useOpenAi = prefs.engine == Prefs.ENGINE_OPENAI
@@ -87,8 +96,8 @@ class TranslationService : Service(), EngineListener {
             )
         } else {
             ttsForVoice = voiceOn
-            if (voiceOn) tts = TtsManager(this).also {
-                it.enabled = true
+            tts = TtsManager(this).also { // always created: TTS can be toggled on live
+                it.enabled = voiceOn
                 it.setRate(prefs.ttsRatePercent / 100f)
                 it.setLanguageByCode(prefs.targetLang)
             }
@@ -142,7 +151,8 @@ class TranslationService : Service(), EngineListener {
             sampleRate = eng.sampleRate,
             mediaProjection = projection,
             onChunk = { eng.sendAudio(it) },
-            onError = { msg -> onError(msg) },
+            // Capture errors are fatal (init failures) — stop, keeping the message.
+            onError = { msg -> onError(msg); main.post { stopEverything() } },
         )
 
         EngineBus.publish(EngineBus.State(running = true, status = "connecting"))
@@ -150,7 +160,36 @@ class TranslationService : Service(), EngineListener {
         audio?.start()
     }
 
+    /** Re-read prefs and apply what can change mid-session (voice, speed, overlay). */
+    private fun applyLiveSettings() {
+        val prefs = Prefs(this)
+
+        if (engine is SonioxClient) {
+            ttsForVoice = prefs.ttsEnabled
+            tts?.enabled = prefs.ttsEnabled
+            tts?.setRate(prefs.ttsRatePercent / 100f)
+            if (!prefs.ttsEnabled) tts?.stop()
+        } else {
+            // OpenAI: native voice can be muted live (chunks already stream).
+            player?.setMuted(!prefs.ttsEnabled)
+        }
+
+        if (prefs.overlayEnabled && overlay == null && canDrawOverlay()) {
+            overlay = OverlayController(this) { stopEverything() }.also { it.show() }
+        } else if (!prefs.overlayEnabled && overlay != null) {
+            overlay?.hide(); overlay = null
+        }
+    }
+
+    private fun clearTranscript() {
+        sourceTranscript.clear()
+        synchronized(translationSegments) { translationSegments.clear() }
+        provSource = ""; provTranslation = ""; lastSourceSegment = ""
+        publishText()
+    }
+
     private fun stopEverything() {
+        pipelineActive = false
         audio?.stop(); audio = null
         engine?.disconnect(); engine = null
         tts?.shutdown(); tts = null
@@ -158,25 +197,33 @@ class TranslationService : Service(), EngineListener {
         overlay?.hide(); overlay = null
         projection?.stop(); projection = null
         refiner?.shutdown(); refiner = null
-        EngineBus.publish(EngineBus.State(running = false, status = "stopped"))
+        // Keep transcript and any error message visible after stopping.
+        EngineBus.update { it.copy(running = false, status = "stopped") }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        audio?.stop()
-        engine?.disconnect()
-        tts?.shutdown()
-        player?.stop()
-        overlay?.hide()
-        projection?.stop()
-        refiner?.shutdown()
+        if (pipelineActive) stopEverything()
     }
 
     // ─── EngineListener ──────────────────────────────────────────────
 
-    override fun onStatus(status: String) = EngineBus.update { it.copy(status = status) }
+    override fun onStatus(status: String) {
+        // A successful (re)connect supersedes any earlier transient error.
+        EngineBus.update {
+            it.copy(status = status, error = if (status == "connected") null else it.error)
+        }
+        // "error" (fatal API error / reconnects exhausted) and an engine-initiated
+        // "disconnected" are terminal: shut down so the mic isn't left recording
+        // into a dead session. The error message set via onError survives
+        // stopEverything(). During an intentional stop, pipelineActive is already
+        // false, so the posted call is a no-op.
+        if (status == "error" || status == "disconnected") {
+            main.post { if (pipelineActive) stopEverything() }
+        }
+    }
 
     override fun onSourceText(text: String, isFinal: Boolean) {
         if (isFinal) {
@@ -214,6 +261,7 @@ class TranslationService : Service(), EngineListener {
         publishText()
         r.refine(lastSourceSegment, text) { improved ->
             main.post {
+                if (!pipelineActive) return@post
                 synchronized(translationSegments) {
                     if (index < translationSegments.size) translationSegments[index] = improved
                 }

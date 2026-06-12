@@ -13,9 +13,11 @@ import java.util.Locale
 class TtsManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val tts = TextToSpeech(context.applicationContext, this)
-    private var ready = false
+    @Volatile private var ready = false
     private var pendingLocale: Locale? = null
     private var rate = 1.0f
+    // Utterances requested before async init finished — flushed once ready.
+    private val pendingTexts = mutableListOf<String>()
 
     @Volatile var enabled = false
 
@@ -24,6 +26,10 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         if (ready) {
             tts.setSpeechRate(rate)
             pendingLocale?.let { applyLocale(it) }
+            val backlog = synchronized(pendingTexts) {
+                val copy = pendingTexts.toList(); pendingTexts.clear(); copy
+            }
+            backlog.forEach { speakNow(it) }
         }
     }
 
@@ -45,7 +51,15 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun speak(text: String) {
-        if (!enabled || !ready || text.isBlank()) return
+        if (!enabled || text.isBlank()) return
+        if (!ready) {
+            synchronized(pendingTexts) { pendingTexts.add(text) }
+            return
+        }
+        speakNow(text)
+    }
+
+    private fun speakNow(text: String) {
         tts.speak(text, TextToSpeech.QUEUE_ADD, null, "tr-${System.nanoTime()}")
     }
 

@@ -19,10 +19,17 @@ object EngineBus {
     @Volatile
     var listener: ((State) -> Unit)? = null
 
+    // Synchronized: updates arrive from WebSocket, capture, and main threads;
+    // an unguarded read-modify-write would drop concurrent changes.
+    @Synchronized
     fun publish(newState: State) {
         state = newState
         listener?.invoke(newState)
     }
 
-    fun update(transform: (State) -> State) = publish(transform(state))
+    @Synchronized
+    fun update(transform: (State) -> State) {
+        state = transform(state)
+        listener?.invoke(state)
+    }
 }

@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
 
     private var overlayRequested = false
     private var notifRequested = false
+    private var syncingSwitches = false
 
     // ── Permission / projection launchers ──────────────────────────────
     private val overlayLauncher =
@@ -34,7 +35,8 @@ class MainActivity : AppCompatActivity() {
 
     private val micLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) tryStart() else setStatus("Microphone permission is required.")
+            if (granted) tryStart()
+            else setStatus("Audio recording permission is required (also for system audio).")
         }
 
     private val projectionLauncher =
@@ -59,18 +61,35 @@ class MainActivity : AppCompatActivity() {
         b.startStopButton.setOnClickListener {
             if (EngineBus.state.running) stopService() else onStartPressed()
         }
-        b.clearButton.setOnClickListener {
-            b.translationText.text = ""; b.provisionalText.text = ""; b.sourceText.text = ""
+        b.clearButton.setOnClickListener { clearTranscript() }
+        b.ttsSwitch.setOnCheckedChangeListener { _, c ->
+            if (syncingSwitches) return@setOnCheckedChangeListener
+            prefs.ttsEnabled = c
+            pushLiveUpdate()
         }
-        b.ttsSwitch.setOnCheckedChangeListener { _, c -> prefs.ttsEnabled = c }
-        b.overlaySwitch.setOnCheckedChangeListener { _, c -> prefs.overlayEnabled = c }
+        b.overlaySwitch.setOnCheckedChangeListener { _, c ->
+            if (syncingSwitches) return@setOnCheckedChangeListener
+            prefs.overlayEnabled = c
+            pushLiveUpdate()
+        }
+        b.liveTtsSwitch.setOnCheckedChangeListener { _, c ->
+            if (syncingSwitches) return@setOnCheckedChangeListener
+            prefs.ttsEnabled = c
+            pushLiveUpdate()
+        }
+        b.liveOverlaySwitch.setOnCheckedChangeListener { _, c ->
+            if (syncingSwitches) return@setOnCheckedChangeListener
+            prefs.overlayEnabled = c
+            pushLiveUpdate()
+        }
         b.refineSwitch.setOnCheckedChangeListener { _, c -> prefs.deepSeekRefine = c }
         b.ttsSpeed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                 prefs.ttsRatePercent = 50 + p
+                renderSpeedLabel()
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) = pushLiveUpdate()
         })
     }
 
@@ -99,6 +118,7 @@ class MainActivity : AppCompatActivity() {
 
         b.engineSpinner.onItemSelectedListener = onSelect { pos ->
             prefs.engine = if (pos == 1) Prefs.ENGINE_OPENAI else Prefs.ENGINE_SONIOX
+            renderEngineFields()
         }
         b.sourceAudioSpinner.onItemSelectedListener = onSelect { pos ->
             prefs.audioSource = if (pos == 1) Prefs.SOURCE_SYSTEM else Prefs.SOURCE_MIC
@@ -124,6 +144,26 @@ class MainActivity : AppCompatActivity() {
         b.ttsSwitch.isChecked = prefs.ttsEnabled
         b.overlaySwitch.isChecked = prefs.overlayEnabled
         b.ttsSpeed.progress = (prefs.ttsRatePercent - 50).coerceIn(0, 150)
+        renderSpeedLabel()
+        renderEngineFields()
+    }
+
+    /** Show only the fields relevant to the selected engine. */
+    private fun renderEngineFields() {
+        val openai = prefs.engine == Prefs.ENGINE_OPENAI
+        b.sonioxKeyInput.visibility = if (openai) View.GONE else View.VISIBLE
+        b.openaiKeyInput.visibility = if (openai) View.VISIBLE else View.GONE
+        // DeepSeek refinement and TTS speed apply to the Soniox pipeline only.
+        val sonioxOnly = if (openai) View.GONE else View.VISIBLE
+        b.refineSwitch.visibility = sonioxOnly
+        b.deepseekKeyInput.visibility = sonioxOnly
+        b.glossaryInput.visibility = sonioxOnly
+        b.ttsSpeedLabel.visibility = sonioxOnly
+        b.ttsSpeed.visibility = sonioxOnly
+    }
+
+    private fun renderSpeedLabel() {
+        b.ttsSpeedLabel.text = getString(R.string.tts_speed_value, prefs.ttsRatePercent)
     }
 
     private fun adapter(items: List<String>) =
@@ -157,6 +197,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Re-entrant: requests one missing prerequisite at a time, then launches. */
     private fun tryStart() {
+        if (EngineBus.state.running) return
         if (prefs.overlayEnabled && !Settings.canDrawOverlays(this) && !overlayRequested) {
             overlayRequested = true
             setStatus("Grant ‘display over other apps’, then press Start again.")
@@ -176,8 +217,9 @@ class MainActivity : AppCompatActivity() {
             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
-        if (prefs.audioSource == Prefs.SOURCE_MIC &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+        // RECORD_AUDIO is required for BOTH sources: AudioPlaybackCapture (system
+        // audio) refuses to build without it, same as the microphone.
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -211,11 +253,41 @@ class MainActivity : AppCompatActivity() {
         startService(intent)
     }
 
+    /** Apply voice/overlay/speed changes to a running session. */
+    private fun pushLiveUpdate() {
+        if (!EngineBus.state.running) return
+        startService(
+            Intent(this, TranslationService::class.java).setAction(TranslationService.ACTION_UPDATE)
+        )
+    }
+
+    private fun clearTranscript() {
+        if (EngineBus.state.running) {
+            startService(
+                Intent(this, TranslationService::class.java).setAction(TranslationService.ACTION_CLEAR)
+            )
+        } else {
+            EngineBus.update {
+                it.copy(source = "", translation = "", provisionalSource = "", provisionalTranslation = "")
+            }
+        }
+    }
+
     // ── Rendering ──────────────────────────────────────────────────────
 
     private fun render(s: EngineBus.State) {
         b.startStopButton.text = getString(if (s.running) R.string.stop else R.string.start)
         setControlsEnabled(!s.running)
+        // While translating, collapse the settings panel so subtitles get the room;
+        // the live bar keeps the voice/overlay toggles reachable.
+        b.settingsScroll.visibility = if (s.running) View.GONE else View.VISIBLE
+        b.liveBar.visibility = if (s.running) View.VISIBLE else View.GONE
+        syncingSwitches = true
+        b.ttsSwitch.isChecked = prefs.ttsEnabled
+        b.overlaySwitch.isChecked = prefs.overlayEnabled
+        b.liveTtsSwitch.isChecked = prefs.ttsEnabled
+        b.liveOverlaySwitch.isChecked = prefs.overlayEnabled
+        syncingSwitches = false
 
         val statusLine = s.error ?: when (s.status) {
             "connecting" -> "Connecting…"
@@ -225,10 +297,21 @@ class MainActivity : AppCompatActivity() {
         }
         b.statusText.text = statusLine
 
+        // Smart scroll: only follow new text if the user is already near the bottom.
+        val child = b.scrollView.getChildAt(0)
+        val nearBottom = child == null ||
+            child.bottom - (b.scrollView.height + b.scrollView.scrollY) <= dp(96)
+
         b.translationText.text = s.translation
         b.provisionalText.text = s.provisionalTranslation
-        b.sourceText.text = listOf(s.source, s.provisionalSource).filter { it.isNotBlank() }.joinToString(" ")
-        b.scrollView.post { b.scrollView.fullScroll(View.FOCUS_DOWN) }
+        b.sourceText.text = listOf(s.source, s.provisionalSource)
+            .filter { it.isNotBlank() }.joinToString(" ")
+
+        if (nearBottom) {
+            b.scrollView.post {
+                b.scrollView.getChildAt(0)?.let { b.scrollView.scrollTo(0, it.bottom) }
+            }
+        }
     }
 
     private fun setControlsEnabled(enabled: Boolean) {
@@ -246,4 +329,6 @@ class MainActivity : AppCompatActivity() {
     private fun setStatus(text: String) {
         b.statusText.text = text
     }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 }

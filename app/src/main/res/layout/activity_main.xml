@@ -7,6 +7,7 @@
     android:padding="16dp">
 
     <ScrollView
+        android:id="@+id/settingsScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -38,17 +39,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/openai_key_hint"
-                android:inputType="textPassword"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:maxLines="1" />
-
-            <EditText
-                android:id="@+id/deepseekKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/deepseek_key_hint"
                 android:inputType="textPassword"
                 android:importantForAutofill="no"
                 android:textColor="@color/on_surface"
@@ -107,28 +97,6 @@
             </LinearLayout>
 
             <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/refineSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/deepseek_refine"
-                android:textColor="@color/on_surface"
-                android:paddingTop="8dp" />
-
-            <EditText
-                android:id="@+id/glossaryInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/glossary_hint"
-                android:inputType="textMultiLine"
-                android:minLines="2"
-                android:maxLines="4"
-                android:gravity="top"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:textSize="13sp" />
-
-            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/ttsSwitch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -136,7 +104,10 @@
                 android:textColor="@color/on_surface"
                 android:paddingTop="8dp" />
 
-            <TextView style="@style/Label" android:text="@string/tts_speed" />
+            <TextView
+                android:id="@+id/ttsSpeedLabel"
+                style="@style/Label"
+                android:text="@string/tts_speed" />
             <SeekBar
                 android:id="@+id/ttsSpeed"
                 android:layout_width="match_parent"
@@ -151,17 +122,75 @@
                 android:textColor="@color/on_surface"
                 android:paddingTop="4dp" />
 
-            <TextView
-                android:id="@+id/statusText"
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/refineSwitch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/status_idle"
-                android:textColor="@color/muted"
-                android:textSize="12sp"
-                android:paddingTop="8dp"
-                android:paddingBottom="4dp" />
+                android:text="@string/deepseek_refine"
+                android:textColor="@color/on_surface"
+                android:paddingTop="4dp" />
+
+            <EditText
+                android:id="@+id/deepseekKeyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/deepseek_key_hint"
+                android:inputType="textPassword"
+                android:importantForAutofill="no"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/muted"
+                android:maxLines="1" />
+
+            <EditText
+                android:id="@+id/glossaryInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/glossary_hint"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:importantForAutofill="no"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/muted"
+                android:textSize="13sp" />
         </LinearLayout>
     </ScrollView>
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/status_idle"
+        android:textColor="@color/muted"
+        android:textSize="12sp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp" />
+
+    <!-- Quick controls shown only while a session is running (settings hidden). -->
+    <LinearLayout
+        android:id="@+id/liveBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/liveTtsSwitch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/voice_short"
+            android:textColor="@color/on_surface" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/liveOverlaySwitch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/overlay_short"
+            android:textColor="@color/on_surface" />
+    </LinearLayout>
 
     <View
         android:layout_width="match_parent"

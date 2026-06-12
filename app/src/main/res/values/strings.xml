@@ -22,6 +22,9 @@
     <string name="source_mic">Microphone</string>
     <string name="source_system">System audio (media only)</string>
     <string name="tts_speed">Voice speed</string>
+    <string name="tts_speed_value">Voice speed (%1$d%%)</string>
+    <string name="voice_short">Voice</string>
+    <string name="overlay_short">Overlay</string>
     <string name="notif_title">My Translator is running</string>
     <string name="notif_text">Listening and translating…</string>
     <string name="notif_channel">Translation</string>
