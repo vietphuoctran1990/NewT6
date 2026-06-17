@@ -110,6 +110,12 @@ class AudioCapture(
                     .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                     .addMatchingUsage(AudioAttributes.USAGE_GAME)
                     .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                    // Exclude our own playback so the translated voice (TTS / OpenAI
+                    // native audio) isn't recaptured and translated again — otherwise
+                    // enabling voice while capturing system audio creates a feedback
+                    // loop. Routing to headphones does NOT prevent this; capture happens
+                    // at the audio mix, not the acoustic output.
+                    .excludeUid(android.os.Process.myUid())
                     .build()
                 AudioRecord.Builder()
                     .setAudioFormat(format)

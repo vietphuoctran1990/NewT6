@@ -28,5 +28,5 @@
     <string name="notif_title">My Translator is running</string>
     <string name="notif_text">Listening and translating…</string>
     <string name="notif_channel">Translation</string>
-    <string name="system_audio_note">System audio captures media/YouTube only — not voice calls (Zoom/Meet) or DRM (Netflix).</string>
+    <string name="system_audio_note">Translates sound from other apps (YouTube, video, music, games). Not voice calls (Zoom/Meet) or DRM (Netflix) — an Android limit. Tip: use headphones for the spoken translation, and lower the original app\'s volume if the voices overlap.</string>
 </resources>
