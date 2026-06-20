@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">My Translator</string>
+    <string name="app_tagline">Real-time speech translation</string>
+    <string name="section_engine">Engine</string>
+    <string name="section_translation">Translation</string>
+    <string name="section_refine">Refine · DeepSeek</string>
+    <string name="section_audio">Audio &amp; voice</string>
     <string name="soniox_key_hint">Soniox API key</string>
     <string name="openai_key_hint">OpenAI API key</string>
     <string name="deepseek_key_hint">DeepSeek API key (optional)</string>

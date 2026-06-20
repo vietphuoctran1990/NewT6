@@ -203,12 +203,9 @@ class MainActivity : AppCompatActivity() {
         }
         syncingSpinners = false
 
-        // DeepSeek refinement applies to Soniox one-way only.
+        // DeepSeek refinement applies to Soniox one-way only — hide the whole card.
         val sonioxOneWay = prefs.engine == Prefs.ENGINE_SONIOX && !twoWay
-        val refineVis = if (sonioxOneWay) View.VISIBLE else View.GONE
-        b.refineSwitch.visibility = refineVis
-        b.deepseekKeyInput.visibility = refineVis
-        b.glossaryInput.visibility = refineVis
+        b.refineCard.visibility = if (sonioxOneWay) View.VISIBLE else View.GONE
     }
 
     private fun renderSpeedLabel() {
@@ -216,8 +213,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun adapter(items: List<String>) =
-        ArrayAdapter(this, android.R.layout.simple_spinner_item, items).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        ArrayAdapter(this, R.layout.spinner_item, items).apply {
+            setDropDownViewResource(R.layout.spinner_dropdown_item)
         }
 
     private fun onSelect(onPos: (Int) -> Unit) = object : AdapterView.OnItemSelectedListener {

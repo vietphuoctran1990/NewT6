@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#FF6A00</color>
+    <!-- Accent -->
+    <color name="brand">#FF7A1A</color>
     <color name="brand_dark">#C24E00</color>
-    <color name="bg">#0E1116</color>
-    <color name="surface">#1A1F27</color>
-    <color name="on_surface">#E6EAF0</color>
-    <color name="muted">#8A93A2</color>
+    <color name="brand2">#FF2D74</color>
+    <color name="accent">#5B8CFF</color>
+
+    <!-- Surfaces -->
+    <color name="bg">#090B11</color>
+    <color name="bg2">#0E121B</color>
+    <color name="surface">#151A24</color>
+    <color name="glass">#CC141A26</color>
+    <color name="glass_soft">#14FFFFFF</color>
+    <color name="glass_stroke">#26FFFFFF</color>
+    <color name="field">#0E1420</color>
+
+    <!-- Text -->
+    <color name="on_surface">#F3F6FB</color>
+    <color name="muted">#99A4B6</color>
     <color name="source_text">#9FB4D6</color>
     <color name="translation_text">#FFFFFF</color>
     <color name="white">#FFFFFF</color>

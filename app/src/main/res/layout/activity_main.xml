@@ -3,179 +3,213 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg"
-    android:padding="16dp">
+    android:fitsSystemWindows="true"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="14dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/on_surface"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.01" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_tagline"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+    </LinearLayout>
 
     <ScrollView
         android:id="@+id/settingsScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:scrollbars="none"
+        android:clipToPadding="false">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView style="@style/Label" android:text="@string/engine" />
-            <Spinner
-                android:id="@+id/engineSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <EditText
-                android:id="@+id/sonioxKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/soniox_key_hint"
-                android:inputType="textPassword"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:maxLines="1" />
-
-            <EditText
-                android:id="@+id/openaiKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/openai_key_hint"
-                android:inputType="textPassword"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:maxLines="1" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/get_key"
-                android:textColor="@color/muted"
-                android:textSize="11sp"
-                android:paddingTop="2dp"
-                android:paddingBottom="6dp" />
-
-            <TextView android:id="@+id/modeLabel" style="@style/Label" android:text="@string/mode" />
-            <Spinner
-                android:id="@+id/modeSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView style="@style/Label" android:text="@string/audio_source" />
-            <Spinner
-                android:id="@+id/sourceAudioSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/system_audio_note"
-                android:textColor="@color/muted"
-                android:textSize="11sp"
-                android:paddingBottom="6dp" />
-
-            <TextView
-                android:id="@+id/languageLabel"
-                style="@style/Label"
-                android:text="@string/languages_one_way" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingTop="4dp">
-
-                <Spinner
-                    android:id="@+id/sourceSpinner"
-                    android:layout_width="0dp"
+            <!-- Engine -->
+            <com.google.android.material.card.MaterialCardView style="@style/GlassCard">
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1" />
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/langArrow"
-                    android:layout_width="wrap_content"
+                    <TextView style="@style/SectionTitle" android:text="@string/section_engine" />
+
+                    <Spinner android:id="@+id/engineSpinner" style="@style/GlassSpinner" />
+
+                    <EditText
+                        android:id="@+id/sonioxKeyInput"
+                        style="@style/FieldInput"
+                        android:hint="@string/soniox_key_hint"
+                        android:inputType="textPassword"
+                        android:maxLines="1" />
+
+                    <EditText
+                        android:id="@+id/openaiKeyInput"
+                        style="@style/FieldInput"
+                        android:hint="@string/openai_key_hint"
+                        android:inputType="textPassword"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/get_key"
+                        android:textColor="@color/muted"
+                        android:textSize="11sp"
+                        android:paddingTop="8dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Translation -->
+            <com.google.android.material.card.MaterialCardView style="@style/GlassCard">
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="→"
-                    android:textColor="@color/brand"
-                    android:textSize="20sp"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp" />
+                    android:orientation="vertical">
 
-                <Spinner
-                    android:id="@+id/targetSpinner"
-                    android:layout_width="0dp"
+                    <TextView style="@style/SectionTitle" android:text="@string/section_translation" />
+
+                    <TextView android:id="@+id/modeLabel" style="@style/Label" android:text="@string/mode" />
+                    <Spinner android:id="@+id/modeSpinner" style="@style/GlassSpinner" />
+
+                    <TextView android:id="@+id/languageLabel" style="@style/Label" android:text="@string/languages_one_way" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <Spinner
+                            android:id="@+id/sourceSpinner"
+                            style="@style/GlassSpinner"
+                            android:layout_width="0dp"
+                            android:layout_weight="1" />
+
+                        <TextView
+                            android:id="@+id/langArrow"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="→"
+                            android:textColor="@color/brand"
+                            android:textSize="20sp"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp" />
+
+                        <Spinner
+                            android:id="@+id/targetSpinner"
+                            style="@style/GlassSpinner"
+                            android:layout_width="0dp"
+                            android:layout_weight="1" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/twoWayNote"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/two_way_note"
+                        android:textColor="@color/muted"
+                        android:textSize="11sp"
+                        android:paddingTop="8dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Refine (DeepSeek) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/refineCard"
+                style="@style/GlassCard">
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1" />
-            </LinearLayout>
+                    android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/twoWayNote"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/two_way_note"
-                android:textColor="@color/muted"
-                android:textSize="11sp"
-                android:paddingTop="4dp"
-                android:visibility="gone" />
+                    <TextView style="@style/SectionTitle" android:text="@string/section_refine" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/ttsSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/speak_translation"
-                android:textColor="@color/on_surface"
-                android:paddingTop="8dp" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/refineSwitch"
+                        style="@style/SwitchRow"
+                        android:text="@string/deepseek_refine" />
 
-            <TextView
-                android:id="@+id/ttsSpeedLabel"
-                style="@style/Label"
-                android:text="@string/tts_speed" />
-            <SeekBar
-                android:id="@+id/ttsSpeed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="150" />
+                    <EditText
+                        android:id="@+id/deepseekKeyInput"
+                        style="@style/FieldInput"
+                        android:hint="@string/deepseek_key_hint"
+                        android:inputType="textPassword"
+                        android:maxLines="1" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/overlaySwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/floating_subtitles"
-                android:textColor="@color/on_surface"
-                android:paddingTop="4dp" />
+                    <EditText
+                        android:id="@+id/glossaryInput"
+                        style="@style/FieldInput"
+                        android:hint="@string/glossary_hint"
+                        android:inputType="textMultiLine"
+                        android:gravity="top"
+                        android:minLines="2"
+                        android:maxLines="4"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/refineSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/deepseek_refine"
-                android:textColor="@color/on_surface"
-                android:paddingTop="4dp" />
+            <!-- Audio & voice -->
+            <com.google.android.material.card.MaterialCardView style="@style/GlassCard">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
 
-            <EditText
-                android:id="@+id/deepseekKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/deepseek_key_hint"
-                android:inputType="textPassword"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:maxLines="1" />
+                    <TextView style="@style/SectionTitle" android:text="@string/section_audio" />
 
-            <EditText
-                android:id="@+id/glossaryInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/glossary_hint"
-                android:inputType="textMultiLine"
-                android:minLines="2"
-                android:maxLines="4"
-                android:gravity="top"
-                android:importantForAutofill="no"
-                android:textColor="@color/on_surface"
-                android:textColorHint="@color/muted"
-                android:textSize="13sp" />
+                    <TextView style="@style/Label" android:text="@string/audio_source" />
+                    <Spinner android:id="@+id/sourceAudioSpinner" style="@style/GlassSpinner" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/system_audio_note"
+                        android:textColor="@color/muted"
+                        android:textSize="11sp"
+                        android:paddingTop="6dp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/ttsSwitch"
+                        style="@style/SwitchRow"
+                        android:text="@string/speak_translation"
+                        android:paddingTop="6dp" />
+
+                    <TextView android:id="@+id/ttsSpeedLabel" style="@style/Label" android:text="@string/tts_speed" />
+                    <SeekBar
+                        android:id="@+id/ttsSpeed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="150" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/overlaySwitch"
+                        style="@style/SwitchRow"
+                        android:text="@string/floating_subtitles" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
         </LinearLayout>
     </ScrollView>
 
@@ -183,18 +217,26 @@
         android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@drawable/pill_bg"
         android:text="@string/status_idle"
         android:textColor="@color/muted"
         android:textSize="12sp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp" />
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:layout_marginTop="10dp" />
 
-    <!-- Quick controls shown only while a session is running (settings hidden). -->
+    <!-- Quick controls shown only while a session is running. -->
     <LinearLayout
         android:id="@+id/liveBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:background="@drawable/pill_bg"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:layout_marginTop="8dp"
         android:visibility="gone">
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -202,6 +244,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minHeight="48dp"
+            android:gravity="center_vertical"
             android:text="@string/voice_short"
             android:textColor="@color/on_surface" />
 
@@ -210,85 +254,90 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minHeight="48dp"
+            android:gravity="center_vertical"
             android:text="@string/overlay_short"
             android:textColor="@color/on_surface" />
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/surface" />
-
-    <ScrollView
-        android:id="@+id/scrollView"
-        android:layout_width="match_parent"
+    <!-- Transcript -->
+    <com.google.android.material.card.MaterialCardView
+        style="@style/GlassCard"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingTop="10dp"
-        android:fillViewport="true">
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="0dp">
 
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/scrollView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:fillViewport="true">
 
-            <TextView
-                android:id="@+id/translationText"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/translation_text"
-                android:textSize="26sp"
-                android:textIsSelectable="true"
-                android:lineSpacingMultiplier="1.15" />
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/provisionalText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/muted"
-                android:textStyle="italic"
-                android:textSize="22sp"
-                android:paddingTop="4dp" />
+                <TextView
+                    android:id="@+id/translationText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/translation_text"
+                    android:textSize="26sp"
+                    android:textIsSelectable="true"
+                    android:lineSpacingMultiplier="1.15" />
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/surface"
-                android:layout_marginTop="14dp"
-                android:layout_marginBottom="14dp" />
+                <TextView
+                    android:id="@+id/provisionalText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/muted"
+                    android:textStyle="italic"
+                    android:textSize="22sp"
+                    android:paddingTop="4dp" />
 
-            <TextView
-                android:id="@+id/sourceText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/source_text"
-                android:textSize="16sp"
-                android:textIsSelectable="true"
-                android:lineSpacingMultiplier="1.1" />
-        </LinearLayout>
-    </ScrollView>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/glass_stroke"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="14dp" />
 
+                <TextView
+                    android:id="@+id/sourceText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/source_text"
+                    android:textSize="16sp"
+                    android:textIsSelectable="true"
+                    android:lineSpacingMultiplier="1.1" />
+            </LinearLayout>
+        </ScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="8dp">
+        android:layout_marginTop="12dp">
 
-        <Button
+        <TextView
             android:id="@+id/startStopButton"
+            style="@style/PrimaryButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/start"
-            android:backgroundTint="@color/brand"
-            android:textColor="@color/white" />
+            android:text="@string/start" />
 
-        <Button
+        <TextView
             android:id="@+id/clearButton"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/GhostButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="10dp"
+            android:paddingStart="26dp"
+            android:paddingEnd="26dp"
             android:text="@string/clear" />
     </LinearLayout>
 

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base diagonal gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="115"
+                android:startColor="#0C0F18"
+                android:endColor="#05060A" />
+        </shape>
+    </item>
+    <!-- Warm glow, top-right -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="560dp"
+                android:centerX="0.88"
+                android:centerY="0.02"
+                android:startColor="#3DFF6A00"
+                android:endColor="#00FF6A00" />
+        </shape>
+    </item>
+    <!-- Pink glow, upper-left -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="520dp"
+                android:centerX="0.06"
+                android:centerY="0.16"
+                android:startColor="#2EFF2D74"
+                android:endColor="#00FF2D74" />
+        </shape>
+    </item>
+</layer-list>
