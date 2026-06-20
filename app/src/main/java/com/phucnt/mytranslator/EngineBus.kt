@@ -9,6 +9,7 @@ object EngineBus {
         val translation: String = "",
         val provisionalSource: String = "",
         val provisionalTranslation: String = "",
+        val twoWay: Boolean = false,
         val error: String? = null,
     )
 

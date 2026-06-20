@@ -33,6 +33,9 @@ class TranslationService : Service(), EngineListener {
 
         private const val CHANNEL_ID = "translation"
         private const val NOTIF_ID = 1
+        // Wait a moment after speech ends before re-opening the mic, so the tail
+        // of the spoken translation isn't recaptured (half-duplex, two-way).
+        private const val MIC_RESUME_DELAY_MS = 350L
     }
 
     private val main = Handler(Looper.getMainLooper())
@@ -52,6 +55,7 @@ class TranslationService : Service(), EngineListener {
 
     private var ttsForVoice = false // Soniox: speak via TTS. OpenAI: native audio instead.
     private var refiner: DeepSeekRefiner? = null
+    private var twoWayActive = false
 
     @Volatile private var pipelineActive = false
 
@@ -81,6 +85,9 @@ class TranslationService : Service(), EngineListener {
 
         val useOpenAi = prefs.engine == Prefs.ENGINE_OPENAI
         val voiceOn = prefs.ttsEnabled
+        // Two-way (bilingual conversation) is Soniox-only and always uses the mic.
+        val twoWay = !useOpenAi && prefs.translationMode == Prefs.MODE_TWO_WAY
+        twoWayActive = twoWay
 
         // Build engine.
         engine = if (useOpenAi) {
@@ -99,9 +106,18 @@ class TranslationService : Service(), EngineListener {
             tts = TtsManager(this).also { // always created: TTS can be toggled on live
                 it.enabled = voiceOn
                 it.setRate(prefs.ttsRatePercent / 100f)
-                it.setLanguageByCode(prefs.targetLang)
+                if (twoWay) {
+                    // Half-duplex: mute the mic while the translation is spoken so it
+                    // isn't recaptured and translated back. Language is set per segment.
+                    it.onSpeakingChanged = { sp ->
+                        if (sp) audio?.setMuted(true)
+                        else main.postDelayed({ audio?.setMuted(false) }, MIC_RESUME_DELAY_MS)
+                    }
+                } else {
+                    it.setLanguageByCode(prefs.targetLang)
+                }
             }
-            if (prefs.deepSeekRefine && prefs.deepSeekKey.isNotBlank()) {
+            if (!twoWay && prefs.deepSeekRefine && prefs.deepSeekKey.isNotBlank()) {
                 refiner = DeepSeekRefiner(
                     apiKey = prefs.deepSeekKey,
                     targetLanguageName = Languages.nameForCode(prefs.targetLang),
@@ -114,13 +130,16 @@ class TranslationService : Service(), EngineListener {
                     sourceLanguage = prefs.sourceLang,
                     targetLanguage = prefs.targetLang,
                     endpointDelayMs = prefs.endpointDelayMs,
+                    twoWay = twoWay,
+                    langA = prefs.langA,
+                    langB = prefs.langB,
                 ),
                 this
             )
         }
 
-        // Resolve audio source (mic or system playback capture).
-        val source = if (prefs.audioSource == Prefs.SOURCE_SYSTEM)
+        // Resolve audio source (mic or system playback capture). Two-way is mic-only.
+        val source = if (!twoWay && prefs.audioSource == Prefs.SOURCE_SYSTEM)
             AudioCapture.Source.SYSTEM else AudioCapture.Source.MIC
 
         if (source == AudioCapture.Source.SYSTEM) {
@@ -155,7 +174,7 @@ class TranslationService : Service(), EngineListener {
             onError = { msg -> onError(msg); main.post { stopEverything() } },
         )
 
-        EngineBus.publish(EngineBus.State(running = true, status = "connecting"))
+        EngineBus.publish(EngineBus.State(running = true, status = "connecting", twoWay = twoWay))
         eng.connect()
         audio?.start()
     }
@@ -272,6 +291,23 @@ class TranslationService : Service(), EngineListener {
         }
     }
 
+    override fun onSegment(text: String, language: String, isTranslation: Boolean, isFinal: Boolean) {
+        if (!isFinal) {
+            provTranslation = text
+            overlay?.update("", text)
+            publishText()
+            return
+        }
+        val label = language.uppercase()
+        // Original line, then its translation indented underneath, forming a chat log.
+        val line = if (isTranslation) "   ↳ $label  $text" else "▸ $label  $text"
+        synchronized(translationSegments) { translationSegments.add(line) }
+        provTranslation = ""
+        overlay?.update("$label  $text", "")
+        if (isTranslation && ttsForVoice) tts?.speak(text, language) // speak in the target side's language
+        publishText()
+    }
+
     override fun onAudioChunk(pcmBase64: String) {
         player?.push(pcmBase64)
     }
@@ -279,13 +315,15 @@ class TranslationService : Service(), EngineListener {
     override fun onError(message: String) = EngineBus.update { it.copy(error = message) }
 
     private fun publishText() {
-        val translation = synchronized(translationSegments) { translationSegments.joinToString(" ") }
+        val sep = if (twoWayActive) "\n" else " "
+        val translation = synchronized(translationSegments) { translationSegments.joinToString(sep) }
         EngineBus.update {
             it.copy(
                 source = sourceTranscript.toString(),
                 translation = translation,
                 provisionalSource = provSource,
                 provisionalTranslation = provTranslation,
+                twoWay = twoWayActive,
             )
         }
     }
@@ -313,7 +351,11 @@ class TranslationService : Service(), EngineListener {
             .setOngoing(true)
             .build()
 
-        val isSystem = Prefs(this).audioSource == Prefs.SOURCE_SYSTEM
+        val prefs = Prefs(this)
+        // Two-way forces the mic, so don't declare a media-projection FGS type
+        // (Android 14+ requires a live projection token for that type).
+        val twoWay = prefs.engine == Prefs.ENGINE_SONIOX && prefs.translationMode == Prefs.MODE_TWO_WAY
+        val isSystem = !twoWay && prefs.audioSource == Prefs.SOURCE_SYSTEM
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val type = if (isSystem)
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION

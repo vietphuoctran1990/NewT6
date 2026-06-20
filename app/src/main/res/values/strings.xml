@@ -16,6 +16,12 @@
     <string name="clear">Clear</string>
     <string name="waiting">Listening…</string>
     <string name="engine">Engine</string>
+    <string name="mode">Mode</string>
+    <string name="mode_one_way">One-way (A → B)</string>
+    <string name="mode_two_way">Two-way conversation (A ↔ B)</string>
+    <string name="languages_one_way">From → To</string>
+    <string name="languages_two_way">Language A ↔ Language B</string>
+    <string name="two_way_note">Two-way uses the mic and detects who is speaking. Voice mutes the mic while speaking to avoid echo — best with turn-taking.</string>
     <string name="audio_source">Audio source</string>
     <string name="engine_soniox">Soniox (subtitle + TTS voice)</string>
     <string name="engine_openai">OpenAI Realtime (text + native voice)</string>

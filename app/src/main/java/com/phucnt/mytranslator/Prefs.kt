@@ -11,6 +11,8 @@ class Prefs(context: Context) {
         const val ENGINE_OPENAI = "openai"
         const val SOURCE_MIC = "mic"
         const val SOURCE_SYSTEM = "system"
+        const val MODE_ONE_WAY = "one_way"
+        const val MODE_TWO_WAY = "two_way"
     }
 
     var apiKey: String
@@ -50,6 +52,20 @@ class Prefs(context: Context) {
     var targetLang: String
         get() = sp.getString("target_lang", "vi") ?: "vi"
         set(v) = sp.edit().putString("target_lang", v).apply()
+
+    /** One-way vs two-way (bilingual conversation). Two-way is Soniox-only. */
+    var translationMode: String
+        get() = sp.getString("translation_mode", MODE_ONE_WAY) ?: MODE_ONE_WAY
+        set(v) = sp.edit().putString("translation_mode", v).apply()
+
+    /** Two-way languages (no "auto"); the engine auto-detects which side speaks. */
+    var langA: String
+        get() = sp.getString("lang_a", "vi") ?: "vi"
+        set(v) = sp.edit().putString("lang_a", v).apply()
+
+    var langB: String
+        get() = sp.getString("lang_b", "en") ?: "en"
+        set(v) = sp.edit().putString("lang_b", v).apply()
 
     var ttsEnabled: Boolean
         get() = sp.getBoolean("tts_enabled", false)

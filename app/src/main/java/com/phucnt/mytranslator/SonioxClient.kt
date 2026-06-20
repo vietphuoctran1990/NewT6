@@ -30,9 +30,12 @@ class SonioxClient(
 
     data class Config(
         val apiKey: String,
-        val sourceLanguage: String, // "auto" or a language code
-        val targetLanguage: String,
+        val sourceLanguage: String, // "auto" or a language code (one-way)
+        val targetLanguage: String, // one-way target
         val endpointDelayMs: Int = 1200,
+        val twoWay: Boolean = false,
+        val langA: String = "",     // two-way side A
+        val langB: String = "",     // two-way side B
     )
 
     companion object {
@@ -154,19 +157,30 @@ class SonioxClient(
             put("max_endpoint_delay_ms", config.endpointDelayMs)
             put("enable_language_identification", true)
         }
-        if (config.sourceLanguage != Languages.AUTO) {
-            msg.put("language_hints", JSONArray().put(config.sourceLanguage))
+        if (config.twoWay) {
+            // Soniox detects which side is speaking and translates to the other.
+            msg.put("language_hints", JSONArray().put(config.langA).put(config.langB))
+            msg.put("translation", JSONObject().apply {
+                put("type", "two_way")
+                put("language_a", config.langA)
+                put("language_b", config.langB)
+            })
+        } else {
+            if (config.sourceLanguage != Languages.AUTO) {
+                msg.put("language_hints", JSONArray().put(config.sourceLanguage))
+            }
+            msg.put("translation", JSONObject().apply {
+                put("type", "one_way")
+                put("target_language", config.targetLanguage)
+            })
         }
-        msg.put("translation", JSONObject().apply {
-            put("type", "one_way")
-            put("target_language", config.targetLanguage)
-        })
         return msg
     }
 
     private fun handleResponse(data: JSONObject) {
         val tokens = data.optJSONArray("tokens") ?: return
         if (tokens.length() == 0) return
+        if (config.twoWay) { handleTwoWay(tokens); return }
 
         val finalOriginal = StringBuilder()
         val finalTranslation = StringBuilder()
@@ -190,6 +204,53 @@ class SonioxClient(
         // Provisional tails replace the live line (empty string clears it).
         listener.onSourceText(provOriginal.toString(), false)
         listener.onTranslationText(provTranslation.toString(), false)
+    }
+
+    /**
+     * Two-way: separate each batch into spoken original and its translation,
+     * carrying the per-side language so the service can label and speak it.
+     */
+    private fun handleTwoWay(tokens: JSONArray) {
+        val origText = StringBuilder(); var origLang = ""
+        val transText = StringBuilder(); var transLang = ""
+        val provOrig = StringBuilder()
+        val provTrans = StringBuilder()
+
+        for (i in 0 until tokens.length()) {
+            val token = tokens.optJSONObject(i) ?: continue
+            val tokenText = token.optString("text")
+            if (tokenText == "<end>") continue
+            val status = token.optString("translation_status", "none")
+            val isFinal = token.optBoolean("is_final", false)
+            val lang = token.optString("language")
+
+            if (status == "translation") {
+                if (isFinal) {
+                    transText.append(tokenText)
+                    if (transLang.isEmpty() && lang.isNotEmpty()) transLang = lang
+                } else provTrans.append(tokenText)
+            } else { // "original" or "none" (third language)
+                if (isFinal) {
+                    origText.append(tokenText)
+                    if (origLang.isEmpty() && lang.isNotEmpty()) origLang = lang
+                } else provOrig.append(tokenText)
+            }
+        }
+
+        // Soniox sometimes omits the translation language tag — infer the other side.
+        if (transText.isNotBlank() && transLang.isEmpty()) {
+            transLang = if (origLang == config.langA) config.langB else config.langA
+        }
+
+        if (origText.isNotBlank()) listener.onSegment(origText.toString(), origLang, false, true)
+        if (transText.isNotBlank()) listener.onSegment(transText.toString(), transLang, true, true)
+
+        // Live (provisional) tail: prefer the translation, else the original.
+        when {
+            provTrans.isNotBlank() -> listener.onSegment(provTrans.toString(), transLang, true, false)
+            provOrig.isNotBlank() -> listener.onSegment(provOrig.toString(), origLang, false, false)
+            else -> listener.onSegment("", "", false, false)
+        }
     }
 
     private fun handleApiError(data: JSONObject) {

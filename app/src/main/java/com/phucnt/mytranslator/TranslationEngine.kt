@@ -23,5 +23,12 @@ interface EngineListener {
     /** Native translated audio (OpenAI only), base64 PCM16. Default: ignored. */
     fun onAudioChunk(pcmBase64: String) {}
 
+    /**
+     * Two-way (bilingual) segment. [language] is the BCP-47 code of *this* text:
+     * for a translation it is the target language to speak. [isTranslation]
+     * distinguishes the spoken original from its translation. Default: ignored.
+     */
+    fun onSegment(text: String, language: String, isTranslation: Boolean, isFinal: Boolean) {}
+
     fun onError(message: String)
 }

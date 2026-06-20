@@ -34,8 +34,18 @@ class AudioCapture(
     }
 
     @Volatile private var running = false
+    @Volatile private var muted = false
     private var recorder: AudioRecord? = null
     private var worker: Thread? = null
+
+    /**
+     * Half-duplex gate: while muted we keep draining the recorder (so its buffer
+     * doesn't overflow) but drop the audio instead of sending it to the engine.
+     * Used in two-way mode to avoid transcribing our own spoken translation.
+     */
+    fun setMuted(value: Boolean) {
+        muted = value
+    }
 
     @SuppressLint("MissingPermission") // RECORD_AUDIO requested by the caller before start()
     fun start() {
@@ -74,7 +84,7 @@ class AudioCapture(
             while (running) {
                 val read = rec.read(buffer, 0, buffer.size)
                 if (read > 0) {
-                    onChunk(if (read == buffer.size) buffer.copyOf() else buffer.copyOf(read))
+                    if (!muted) onChunk(if (read == buffer.size) buffer.copyOf() else buffer.copyOf(read))
                 } else if (read < 0) {
                     Log.w(TAG, "AudioRecord.read returned $read")
                 }

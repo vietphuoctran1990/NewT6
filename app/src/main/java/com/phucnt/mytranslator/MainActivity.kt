@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private var overlayRequested = false
     private var notifRequested = false
     private var syncingSwitches = false
+    private var syncingSpinners = false
 
     // ── Permission / projection launchers ──────────────────────────────
     private val overlayLauncher =
@@ -110,24 +111,36 @@ class MainActivity : AppCompatActivity() {
         b.engineSpinner.adapter = adapter(
             listOf(getString(R.string.engine_soniox), getString(R.string.engine_openai))
         )
+        b.modeSpinner.adapter = adapter(
+            listOf(getString(R.string.mode_one_way), getString(R.string.mode_two_way))
+        )
         b.sourceAudioSpinner.adapter = adapter(
             listOf(getString(R.string.source_mic), getString(R.string.source_system))
         )
-        b.sourceSpinner.adapter = adapter(Languages.source.map { it.name })
         b.targetSpinner.adapter = adapter(Languages.target.map { it.name })
+        // sourceSpinner's list depends on mode (one-way includes Auto) — set in renderModeUi.
 
         b.engineSpinner.onItemSelectedListener = onSelect { pos ->
             prefs.engine = if (pos == 1) Prefs.ENGINE_OPENAI else Prefs.ENGINE_SONIOX
             renderEngineFields()
         }
+        b.modeSpinner.onItemSelectedListener = onSelect { pos ->
+            if (syncingSpinners) return@onSelect
+            prefs.translationMode = if (pos == 1) Prefs.MODE_TWO_WAY else Prefs.MODE_ONE_WAY
+            renderModeUi()
+        }
         b.sourceAudioSpinner.onItemSelectedListener = onSelect { pos ->
             prefs.audioSource = if (pos == 1) Prefs.SOURCE_SYSTEM else Prefs.SOURCE_MIC
         }
         b.sourceSpinner.onItemSelectedListener = onSelect { pos ->
-            prefs.sourceLang = Languages.source[pos].code
+            if (syncingSpinners) return@onSelect
+            if (isTwoWayUi()) prefs.langA = Languages.target[pos].code
+            else prefs.sourceLang = Languages.source[pos].code
         }
         b.targetSpinner.onItemSelectedListener = onSelect { pos ->
-            prefs.targetLang = Languages.target[pos].code
+            if (syncingSpinners) return@onSelect
+            if (isTwoWayUi()) prefs.langB = Languages.target[pos].code
+            else prefs.targetLang = Languages.target[pos].code
         }
     }
 
@@ -137,10 +150,11 @@ class MainActivity : AppCompatActivity() {
         b.deepseekKeyInput.setText(prefs.deepSeekKey)
         b.glossaryInput.setText(prefs.glossary)
         b.refineSwitch.isChecked = prefs.deepSeekRefine
+        syncingSpinners = true
         b.engineSpinner.setSelection(if (prefs.engine == Prefs.ENGINE_OPENAI) 1 else 0)
+        b.modeSpinner.setSelection(if (prefs.translationMode == Prefs.MODE_TWO_WAY) 1 else 0)
         b.sourceAudioSpinner.setSelection(if (prefs.audioSource == Prefs.SOURCE_SYSTEM) 1 else 0)
-        b.sourceSpinner.setSelection(Languages.indexOfCode(Languages.source, prefs.sourceLang))
-        b.targetSpinner.setSelection(Languages.indexOfCode(Languages.target, prefs.targetLang))
+        syncingSpinners = false
         b.ttsSwitch.isChecked = prefs.ttsEnabled
         b.overlaySwitch.isChecked = prefs.overlayEnabled
         b.ttsSpeed.progress = (prefs.ttsRatePercent - 50).coerceIn(0, 150)
@@ -148,18 +162,53 @@ class MainActivity : AppCompatActivity() {
         renderEngineFields()
     }
 
+    private fun isTwoWayUi() =
+        prefs.engine == Prefs.ENGINE_SONIOX && prefs.translationMode == Prefs.MODE_TWO_WAY
+
     /** Show only the fields relevant to the selected engine. */
     private fun renderEngineFields() {
         val openai = prefs.engine == Prefs.ENGINE_OPENAI
         b.sonioxKeyInput.visibility = if (openai) View.GONE else View.VISIBLE
         b.openaiKeyInput.visibility = if (openai) View.VISIBLE else View.GONE
-        // DeepSeek refinement and TTS speed apply to the Soniox pipeline only.
-        val sonioxOnly = if (openai) View.GONE else View.VISIBLE
-        b.refineSwitch.visibility = sonioxOnly
-        b.deepseekKeyInput.visibility = sonioxOnly
-        b.glossaryInput.visibility = sonioxOnly
-        b.ttsSpeedLabel.visibility = sonioxOnly
-        b.ttsSpeed.visibility = sonioxOnly
+        // Two-way mode is Soniox-only.
+        b.modeLabel.visibility = if (openai) View.GONE else View.VISIBLE
+        b.modeSpinner.visibility = if (openai) View.GONE else View.VISIBLE
+        // TTS speed applies whenever TTS is used (any Soniox mode).
+        val speedVis = if (openai) View.GONE else View.VISIBLE
+        b.ttsSpeedLabel.visibility = speedVis
+        b.ttsSpeed.visibility = speedVis
+        renderModeUi()
+    }
+
+    /** Reconfigure the language pickers and conversation-specific fields for the mode. */
+    private fun renderModeUi() {
+        val twoWay = isTwoWayUi()
+        b.langArrow.text = if (twoWay) "↔" else "→"
+        b.languageLabel.text =
+            getString(if (twoWay) R.string.languages_two_way else R.string.languages_one_way)
+        b.twoWayNote.visibility = if (twoWay) View.VISIBLE else View.GONE
+
+        syncingSpinners = true
+        if (twoWay) {
+            b.sourceSpinner.adapter = adapter(Languages.target.map { it.name }) // no "Auto" for side A
+            b.sourceSpinner.setSelection(Languages.indexOfCode(Languages.target, prefs.langA))
+            b.targetSpinner.setSelection(Languages.indexOfCode(Languages.target, prefs.langB))
+            b.sourceAudioSpinner.setSelection(0) // mic
+            b.sourceAudioSpinner.isEnabled = false
+        } else {
+            b.sourceSpinner.adapter = adapter(Languages.source.map { it.name }) // includes "Auto"
+            b.sourceSpinner.setSelection(Languages.indexOfCode(Languages.source, prefs.sourceLang))
+            b.targetSpinner.setSelection(Languages.indexOfCode(Languages.target, prefs.targetLang))
+            b.sourceAudioSpinner.isEnabled = true
+        }
+        syncingSpinners = false
+
+        // DeepSeek refinement applies to Soniox one-way only.
+        val sonioxOneWay = prefs.engine == Prefs.ENGINE_SONIOX && !twoWay
+        val refineVis = if (sonioxOneWay) View.VISIBLE else View.GONE
+        b.refineSwitch.visibility = refineVis
+        b.deepseekKeyInput.visibility = refineVis
+        b.glossaryInput.visibility = refineVis
     }
 
     private fun renderSpeedLabel() {
@@ -302,6 +351,10 @@ class MainActivity : AppCompatActivity() {
         val nearBottom = child == null ||
             child.bottom - (b.scrollView.height + b.scrollView.scrollY) <= dp(96)
 
+        // Two-way shows an interleaved A↔B conversation (smaller text, no separate
+        // source panel); one-way keeps the big translation + source split.
+        b.translationText.textSize = if (s.twoWay) 18f else 26f
+        b.sourceText.visibility = if (s.twoWay) View.GONE else View.VISIBLE
         b.translationText.text = s.translation
         b.provisionalText.text = s.provisionalTranslation
         b.sourceText.text = listOf(s.source, s.provisionalSource)

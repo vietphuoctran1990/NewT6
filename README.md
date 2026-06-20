@@ -32,6 +32,10 @@ subtitles on top.
   subtitle, then DeepSeek (`deepseek-chat`) re-translates the segment into more
   fluent target-language text — applying your glossary — and that improved
   version is what gets spoken. Each segment upgrades in place.
+- **Two-way conversation (Soniox):** bilingual mode (A ↔ B) — Soniox detects who
+  is speaking and translates to the other language. Shows an interleaved chat
+  transcript; optional voice speaks each side in its own language and mutes the
+  mic while speaking (half-duplex) to avoid echo. Mic-only.
 - **Floating subtitles** over other apps (draggable, font +/−).
 - **Audio source: Microphone or System audio.**
   - ⚠️ Android only allows capturing **media/game** audio (YouTube, video,

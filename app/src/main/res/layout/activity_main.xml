@@ -54,6 +54,12 @@
                 android:paddingTop="2dp"
                 android:paddingBottom="6dp" />
 
+            <TextView android:id="@+id/modeLabel" style="@style/Label" android:text="@string/mode" />
+            <Spinner
+                android:id="@+id/modeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
             <TextView style="@style/Label" android:text="@string/audio_source" />
             <Spinner
                 android:id="@+id/sourceAudioSpinner"
@@ -66,6 +72,11 @@
                 android:textColor="@color/muted"
                 android:textSize="11sp"
                 android:paddingBottom="6dp" />
+
+            <TextView
+                android:id="@+id/languageLabel"
+                style="@style/Label"
+                android:text="@string/languages_one_way" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -81,6 +92,7 @@
                     android:layout_weight="1" />
 
                 <TextView
+                    android:id="@+id/langArrow"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="→"
@@ -95,6 +107,16 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/twoWayNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/two_way_note"
+                android:textColor="@color/muted"
+                android:textSize="11sp"
+                android:paddingTop="4dp"
+                android:visibility="gone" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/ttsSwitch"
